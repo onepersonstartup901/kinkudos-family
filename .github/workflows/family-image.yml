@@ -75,6 +75,12 @@ jobs:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Files uploaded through the GitHub website lose their executable bit.
+      - name: Restore executable scripts
+        run: |
+          chmod +x deploy/*.sh deploy/kinkudos-diagnose docker/entrypoint.sh \
+            scripts/backup_agent.py scripts/package_release.py
+
       - name: Image name
         id: image
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/kinkudos-family" >> "$GITHUB_OUTPUT"
