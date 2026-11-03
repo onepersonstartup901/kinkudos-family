@@ -420,7 +420,7 @@ class LotteryViewTests(TestCase):
 
         self.assertContains(response, "Buy for 22 AUD")
         self.assertContains(response, "Cards left this week: 5 of 5.")
-        self.assertContains(response, "It costs 22 earned galleons.")
+        self.assertContains(response, "It costs 22 AUD you have earned.")
 
     def test_disabled_lottery_is_hidden_without_an_open_ticket(self):
         self.family.lottery_enabled = False

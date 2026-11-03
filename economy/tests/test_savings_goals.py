@@ -97,7 +97,7 @@ class SavingsGoalServiceTests(TestCase):
         select_goal_mode(goal=credit_goal, child=self.child, mode=GoalMode.SAVED)
         with self.assertRaisesMessage(
             ValidationError,
-            "You can save only points you currently have available.",
+            "You can save only money you currently have available.",
         ):
             add_saved_points(goal=credit_goal, child=self.child, amount=1)
         self.assertEqual(goal.contributions.count(), 1)
@@ -494,10 +494,10 @@ class SavingsGoalServiceTests(TestCase):
         self.assertContains(response, "Delete goal and return saved money?", html=False)
         self.assertContains(
             response,
-            "50 saved points will be returned to Goal child’s available balance before this goal is removed.",
+            "50 AUD of savings will be returned to Goal child’s available balance before this goal is removed.",
             html=False,
         )
-        self.assertContains(response, "Return points and delete", html=False)
+        self.assertContains(response, "Return money and delete", html=False)
 
     def test_parent_can_delete_goal_through_the_explicit_post_endpoint(self):
         self.fund_child(100)
