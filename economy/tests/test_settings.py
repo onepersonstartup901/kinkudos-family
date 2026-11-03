@@ -100,7 +100,7 @@ class ParentSettingsTests(TestCase):
 
         response = self.client.get(reverse("parent_dashboard"))
 
-        self.assertContains(response, "Points for a task photo")
+        self.assertContains(response, "Bonus for a task photo (AUD)")
         self.assertContains(response, "Surprise card price")
         self.assertContains(response, "Weekly card limit")
         self.assertContains(response, "Keep feedback images for")
@@ -285,7 +285,7 @@ class ParentSettingsTests(TestCase):
 
         response = self.client.get(reverse("parent_dashboard"))
 
-        self.assertContains(response, 'class="settings-row"', count=7, html=False)
+        self.assertContains(response, 'class="settings-row"', count=10, html=False)
         self.assertContains(response, 'class="settings-row checkbox-field"', count=1)
         self.assertContains(response, "Weekly card limit")
         self.assertContains(
@@ -380,7 +380,7 @@ class ParentSettingsTests(TestCase):
         )
         for heading in (
             "Family",
-            "Points and tasks",
+            "Money and tasks",
             "Surprise cards",
             "Data and retention",
             "Child devices",

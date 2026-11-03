@@ -224,7 +224,7 @@ class AccessAndWorkflowTests(TestCase):
             html=False,
         )
         self.assertContains(response, "Dviratis")
-        self.assertContains(response, "Siūlo: 500 taškų")
+        self.assertContains(response, "Siūlo: 500 AUD")
         self.assertNotContains(response, ">Patvirtinti</button>", html=False)
         self.assertNotContains(response, ">Atmesti</button>", html=False)
 
@@ -923,12 +923,12 @@ class AccessAndWorkflowTests(TestCase):
         self.assertNotContains(response, "Aurora šeima")
         self.assertContains(
             response,
-            'class="catalog-token catalog-token-negative">−100 taškų',
+            'class="catalog-token catalog-token-negative">−100 AUD',
             html=False,
         )
         self.assertNotContains(
             response,
-            'class="catalog-token catalog-token-positive">−100 taškų',
+            'class="catalog-token catalog-token-positive">−100 AUD',
             html=False,
         )
         self.assertContains(response, ">Darbai<", html=False)
@@ -1151,7 +1151,7 @@ class AccessAndWorkflowTests(TestCase):
         response = self.client.get(reverse("parent_dashboard"))
 
         self.assertContains(response, "How does the credit limit work?")
-        self.assertContains(response, "Saved points")
+        self.assertContains(response, "Saved money")
         self.assertNotContains(response, "Got it")
 
     def test_parent_history_is_paginated_and_filterable_without_a_collapse_header(self):

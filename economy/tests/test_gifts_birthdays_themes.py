@@ -15,7 +15,7 @@ from economy.models import (
     Theme,
 )
 from economy.services import award_birthdays, transfer_points
-from economy.templatetags.economy_tags import currency_unit
+from economy.templatetags.economy_tags import themed_currency_unit
 
 
 class GiftTests(TestCase):
@@ -125,11 +125,11 @@ class ThemeAndViewTests(TestCase):
                 Theme.PANDA_PET: ("bambukas", "bambukai", "bambukų"),
                 Theme.BLOCKVILLE: ("kubelis", "kubeliai", "kubelių"),
             }.items():
-                self.assertEqual(currency_unit(1, theme), forms[0])
-                self.assertEqual(currency_unit(5, theme), forms[1])
-                self.assertEqual(currency_unit(10, theme), forms[2])
-                self.assertEqual(currency_unit(21, theme), forms[0])
-                self.assertEqual(currency_unit(111, theme), forms[2])
+                self.assertEqual(themed_currency_unit(1, theme), forms[0])
+                self.assertEqual(themed_currency_unit(5, theme), forms[1])
+                self.assertEqual(themed_currency_unit(10, theme), forms[2])
+                self.assertEqual(themed_currency_unit(21, theme), forms[0])
+                self.assertEqual(themed_currency_unit(111, theme), forms[2])
 
     def test_child_dashboard_has_search_gift_and_birthday_forms(self):
         child = ChildProfile.objects.create(
@@ -175,4 +175,4 @@ class ThemeAndViewTests(TestCase):
         self.assertContains(response, "theme-blockville")
         self.assertContains(response, "Block quests")
         self.assertContains(response, "Complete challenge")
-        self.assertContains(response, "<strong>12</strong><span>cubes</span>", html=True)
+        self.assertContains(response, "<strong>12</strong><span>AUD</span>", html=True)

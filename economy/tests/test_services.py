@@ -212,7 +212,7 @@ class EconomyServiceTests(TestCase):
         too_expensive_reward = Reward.objects.create(title="Too expensive", cost=151)
         with self.assertRaisesMessage(
             ValidationError,
-            "You do not have enough points for this reward.",
+            "You do not have enough money for this reward.",
         ):
             submit_reward_request(child=self.child, reward=too_expensive_reward)
         self.assertFalse(

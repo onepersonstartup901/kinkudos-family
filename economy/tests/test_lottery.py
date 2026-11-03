@@ -113,7 +113,7 @@ class LotteryServiceTests(TestCase):
 
         with self.assertRaisesMessage(
             ValidationError,
-            "A surprise card can be bought only with 15 points you have earned.",
+            "A surprise card can be bought only with 15 AUD you have earned.",
         ):
             purchase_lottery_ticket(child=self.child)
 
@@ -406,7 +406,7 @@ class LotteryViewTests(TestCase):
 
         self.assertContains(response, "Enchanted Surprise")
         self.assertContains(response, "Surprise cards")
-        self.assertContains(response, "Buy for 15 galleons")
+        self.assertContains(response, "Buy for 15 AUD")
         self.assertContains(response, "go down by up to 50")
 
     def test_dashboard_uses_configured_cost_and_limit(self):
@@ -418,7 +418,7 @@ class LotteryViewTests(TestCase):
 
         response = self.client.get(reverse("child_dashboard"))
 
-        self.assertContains(response, "Buy for 22 galleons")
+        self.assertContains(response, "Buy for 22 AUD")
         self.assertContains(response, "Cards left this week: 5 of 5.")
         self.assertContains(response, "It costs 22 earned galleons.")
 

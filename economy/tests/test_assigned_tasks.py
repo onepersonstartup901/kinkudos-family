@@ -425,7 +425,7 @@ class AssignedTaskViewTests(TestCase):
             reverse("child_complete_assigned_task", args=[item.pk]),
             follow=True,
         )
-        self.assertContains(response, "received your points")
+        self.assertContains(response, "received your money")
         self.child.refresh_from_db()
         self.assertEqual(self.child.balance, 20)
 

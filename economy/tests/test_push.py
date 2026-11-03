@@ -166,7 +166,7 @@ class ChildDecisionPushTests(SyncPushDeliveryMixin, TestCase):
         )
         payload = json.loads(webpush.call_args.kwargs["data"])
         self.assertEqual(payload["title"], "Paskirtas darbas atliktas")
-        self.assertEqual(payload["body"], "Child One: Pakloti lovą (+10 taškų)")
+        self.assertEqual(payload["body"], "Child One: Pakloti lovą (+10 AUD)")
         self.assertEqual(
             payload["url"],
             f"{reverse('parent_dashboard')}#parent-history",
@@ -208,25 +208,25 @@ class ChildDecisionPushTests(SyncPushDeliveryMixin, TestCase):
         )
         payload = json.loads(webpush.call_args.kwargs["data"])
         self.assertEqual(payload["title"], "Tavo darbas patvirtintas")
-        self.assertEqual(payload["body"], "Paklota lova: +20 taškų")
+        self.assertEqual(payload["body"], "Paklota lova: +20 AUD")
         self.assertEqual(payload["url"], f"{reverse('child_dashboard')}#darbai")
 
     def test_lithuanian_notification_currency_uses_correct_forms(self):
         with override("lt"):
             for value, expected in (
-                (1, "1 taškas"),
-                (2, "2 taškai"),
-                (9, "9 taškai"),
-                (10, "10 taškų"),
-                (21, "21 taškas"),
+                (1, "1 AUD"),
+                (2, "2 AUD"),
+                (9, "9 AUD"),
+                (10, "10 AUD"),
+                (21, "21 AUD"),
             ):
                 with self.subTest(value=value):
                     self.assertEqual(_currency_amount(value, self.child), expected)
 
             self.child.theme = "block_world"
-            self.assertEqual(_currency_amount(2, self.child), "2 smaragdai")
+            self.assertEqual(_currency_amount(2, self.child), "2 AUD")
             self.child.theme = "magic_academy"
-            self.assertEqual(_currency_amount(1, self.child), "1 galeonas")
+            self.assertEqual(_currency_amount(1, self.child), "1 AUD")
 
     @patch("economy.push.webpush")
     def test_gift_notification_uses_recipient_theme_without_amount(self, webpush):
@@ -244,7 +244,7 @@ class ChildDecisionPushTests(SyncPushDeliveryMixin, TestCase):
         webpush.assert_called_once()
         payload = json.loads(webpush.call_args.kwargs["data"])
         self.assertEqual(payload["title"], "Gavai dovanų!")
-        self.assertEqual(payload["body"], "Child Two tau padovanojo perlų.")
+        self.assertEqual(payload["body"], "Child Two tau padovanojo AUD.")
 
     @patch("economy.push.webpush")
     def test_reward_rejection_includes_reason_and_targets_only_child(self, webpush):

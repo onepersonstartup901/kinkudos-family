@@ -83,7 +83,7 @@ class SavingsGoalServiceTests(TestCase):
 
         with self.assertRaisesMessage(
             ValidationError,
-            "You do not have enough points for this reward.",
+            "You do not have enough money for this reward.",
         ):
             submit_reward_request(child=self.child, reward=reward)
 
@@ -110,7 +110,7 @@ class SavingsGoalServiceTests(TestCase):
 
         with self.assertRaisesMessage(
             ValidationError,
-            "You can add at most 40 points to reach this goal.",
+            "You can add at most 40 AUD to reach this goal.",
         ):
             add_saved_points(goal=goal, child=self.child, amount=41)
         self.assertEqual(goal.contributions.filter(state=SavingsContributionState.ACTIVE).count(), 1)
@@ -238,7 +238,7 @@ class SavingsGoalServiceTests(TestCase):
         )
         self.assertEqual(
             goal.events.order_by("-pk").first().description,
-            "Goal deleted: Bicycle · 50 points returned",
+            "Goal deleted: Bicycle · 50 AUD returned",
         )
 
         with self.assertRaises(SavingsGoal.DoesNotExist):
@@ -380,7 +380,7 @@ class SavingsGoalServiceTests(TestCase):
 
         response = self.client.get(reverse("child_dashboard"))
 
-        self.assertContains(response, "Available balance: 0 points")
+        self.assertContains(response, "Available balance: 0 AUD")
         self.assertContains(response, 'data-goal-available="0"')
         self.assertContains(response, 'max="0"')
 
@@ -491,7 +491,7 @@ class SavingsGoalServiceTests(TestCase):
 
         response = self.client.get(reverse("parent_dashboard"))
 
-        self.assertContains(response, "Delete goal and return saved points?", html=False)
+        self.assertContains(response, "Delete goal and return saved money?", html=False)
         self.assertContains(
             response,
             "50 saved points will be returned to Goal child’s available balance before this goal is removed.",
@@ -512,7 +512,7 @@ class SavingsGoalServiceTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Goal deleted and 50 points returned.")
+        self.assertContains(response, "Goal deleted and 50 AUD returned.")
         goal.refresh_from_db()
         self.child.refresh_from_db()
         self.assertEqual(goal.status, GoalStatus.CANCELLED)
