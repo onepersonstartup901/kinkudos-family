@@ -1,0 +1,9 @@
+[Unit]
+Description=Send KinKudos lottery reminders, assigned-task nudges, and due assignment presets
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=@@KINKUDOS_DEPLOY_DIR@@
+ExecStart=/usr/bin/docker compose exec -T app python manage.py run_scheduled_reminders

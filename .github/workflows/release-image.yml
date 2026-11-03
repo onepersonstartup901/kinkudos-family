@@ -1,0 +1,138 @@
+name: Publish release images
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to publish
+        required: true
+        default: v26.4.9
+
+concurrency:
+  group: release-images-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || !contains(github.ref_name, '-rc.')
+    steps:
+      - name: Check out release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+
+      - name: Validate release tag
+        id: release
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          version="${RELEASE_TAG#v}"
+          configured_version="$(sed -n 's/^version = "\([^"]*\)"$/\1/p' pyproject.toml)"
+          if [[ "$version" != "$configured_version" ]]; then
+            echo "Tag version $version does not match project version $configured_version" >&2
+            exit 1
+          fi
+          python3 scripts/verify_release.py
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "minor=${version%.*}" >> "$GITHUB_OUTPUT"
+          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python 3.12 for Django checks
+        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install locked dependencies for Django checks
+        run: python -m pip install --disable-pip-version-check --requirement requirements.lock
+
+      - name: Run normal Django system check
+        env:
+          KINKUDOS_DEBUG: "false"
+          KINKUDOS_SECRET_KEY: ci-deploy-check-only-9Fq7wR2mX8vK4pL6sN1cD5hJ3tB0zA7yE9uQ
+          KINKUDOS_ALLOWED_HOSTS: test.example.com
+          KINKUDOS_CSRF_TRUSTED_ORIGINS: https://test.example.com
+          KINKUDOS_SECURE_COOKIES: "true"
+          KINKUDOS_SECURE_SSL_REDIRECT: "true"
+          KINKUDOS_HSTS_SECONDS: "31536000"
+        run: python manage.py check
+
+      - name: Run production Django deployment check
+        env:
+          KINKUDOS_DEBUG: "false"
+          KINKUDOS_SECRET_KEY: ci-deploy-check-only-9Fq7wR2mX8vK4pL6sN1cD5hJ3tB0zA7yE9uQ
+          KINKUDOS_ALLOWED_HOSTS: test.example.com
+          KINKUDOS_CSRF_TRUSTED_ORIGINS: https://test.example.com
+          KINKUDOS_SECURE_COOKIES: "true"
+          KINKUDOS_SECURE_SSL_REDIRECT: "true"
+          KINKUDOS_HSTS_SECONDS: "31536000"
+        run: |
+          python scripts/check_deploy.py
+
+      - name: Validate Hostinger Catalog Compose
+        env:
+          KINKUDOS_HOSTNAME: test.example.com
+          KINKUDOS_SETUP_TOKEN: release-validation-only
+        run: docker compose -f deploy/hostinger/compose.yaml config --quiet
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: vooz2
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract image metadata
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        id: meta
+        with:
+          images: |
+            ghcr.io/vooz2/kinkudos
+            vooz2/kinkudos
+          tags: |
+            type=raw,value=${{ steps.release.outputs.version }}
+            type=raw,value=${{ steps.release.outputs.minor }}
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.title=KinKudos
+            org.opencontainers.image.description=Self-hosted family tasks, points, and rewards PWA
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.release.outputs.revision }}
+            org.opencontainers.image.version=${{ steps.release.outputs.version }}
+
+      - name: Build and push release images
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
