@@ -1,0 +1,526 @@
+{% extends "economy/base.html" %}
+{% load economy_tags i18n %}
+{% block title %}{{ child.name }} – {{ project_name }}{% endblock %}
+{% block body_class %}theme-{{ child.theme }} child-area{% endblock %}
+{% block child_state_signature %}{{ child_state_signature }}{% endblock %}
+{% block header_actions %}
+<button id="sound-toggle" class="sound-toggle" type="button" aria-label="{% translate 'Turn sounds off' %}" title="{% translate 'Turn sounds off' %}" aria-pressed="true">
+  <svg class="action-icon" aria-hidden="true"><use href="#icon-volume-high"></use></svg>
+</button>
+<button id="enable-push" class="push-control push-checking" type="button" title="{% translate 'Checking notifications' %}"><svg class="action-icon" aria-hidden="true"><use href="#icon-bell"></use></svg><span class="sr-only" data-push-label>{% translate "Checking notifications" %}</span></button>
+<form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="topbar-icon-button" type="submit" aria-label="{% translate "Switch profile" %}" title="{% translate "Switch profile" %}"><svg class="action-icon" aria-hidden="true"><use href="#icon-right-from-bracket"></use></svg></button></form>
+<dialog id="push-help-dialog" class="action-dialog"><button class="dialog-close" type="button" data-close-dialog aria-label="{% translate 'Close' %}" title="{% translate 'Close' %}">
+        <svg class="action-icon" aria-hidden="true"><use href="#icon-xmark"></use></svg>
+      </button><h2>{% translate "Notifications" %}</h2><p data-push-help-text>{% translate "Notifications could not be enabled on this device." %}</p></dialog>
+{% endblock %}
+{% block content %}
+<section class="child-hero{% if child.avatar %} has-avatar{% endif %}">
+  <div class="child-identity">{% if child.avatar %}<img class="hero-avatar" src="{% url 'child_avatar' child.pk %}" alt="">{% endif %}<div class="child-greeting">{% if greeting_name %}<h1>{% blocktranslate with name=greeting_name %}Hello, {{ name }}!{% endblocktranslate %}</h1>{% else %}<h1>{% translate "Hello!" %}</h1>{% endif %}<p class="child-greeting-supporting">{% translate "Ready for today's tasks?" %}</p></div></div>
+  <div class="balance-orb"><strong>{{ child.balance }}</strong><span>{{ child.balance|currency_unit:child.theme }}</span></div>
+</section>
+
+{% if waiting_for_parents %}
+<section class="waiting-parents-strip" aria-label="{{ child.theme|theme_text:'waiting_parents_eyebrow' }}">
+  <p class="eyebrow">{{ child.theme|theme_text:"waiting_parents_eyebrow" }}</p>
+  <div class="waiting-parents-chips">
+    {% for item in waiting_for_parents %}
+      <a class="waiting-parents-chip" href="{{ item.href }}">
+        <span class="waiting-parents-kind">{{ item.kind_label }}</span>
+        <strong>{{ item.title }}</strong>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if streak %}
+<section class="streak-card{% if streak.earned %} is-earned{% elif streak.broken %} is-broken{% endif %}" aria-labelledby="streak-heading">
+  <div class="streak-copy">
+    <p class="eyebrow">{% translate "Perfect-week streak" %}</p>
+    <h2 id="streak-heading">{% if streak.earned %}{% blocktranslate with amount=streak.bonus %}Bonus locked in: +{{ amount }} AUD on Monday{% endblocktranslate %}{% elif streak.broken %}{% translate "Streak broken this week. Fresh start on Monday." %}{% else %}{% blocktranslate with done=streak.perfect needed=streak.min_days amount=streak.bonus %}{{ done }} of {{ needed }} perfect days for +{{ amount }} AUD{% endblocktranslate %}{% endif %}</h2>
+    <p class="streak-help">{% translate "Finish every job on your list each day. Miss a day and the bonus is gone for the week." %}{% if streak.last_week_paid %} {% blocktranslate with amount=streak.last_week_paid %}Last week you earned {{ amount }} AUD.{% endblocktranslate %}{% endif %}</p>
+  </div>
+  <ol class="streak-days">
+    {% for item in streak.calendar %}<li class="streak-day is-{{ item.state }}{% if item.is_today %} is-today{% endif %}" title="{{ item.day|date:'l j F' }}"><span class="streak-day-name">{{ item.day|date:"D"|slice:":2" }}</span><span class="streak-day-mark" aria-hidden="true">{% if item.state == "perfect" %}✓{% elif item.state == "missed" %}✕{% elif item.state == "open" %}•{% else %}&nbsp;{% endif %}</span></li>{% endfor %}
+  </ol>
+</section>
+{% endif %}
+
+<nav class="tabbar" aria-label="{% translate 'Sections' %}">
+  <a href="#darbai">{{ child.theme|theme_text:"nav_tasks" }}</a><a href="#prizai">{{ child.theme|theme_text:"nav_rewards" }}</a>{% if goals %}<a href="#tikslai">{{ child.theme|theme_text:"nav_goals" }}</a>{% endif %}<a href="#istorija">{{ child.theme|theme_text:"nav_history" }}</a>
+</nav>
+
+<section id="darbai" class="content-section">
+  {% if active_assigned_tasks %}
+  <section id="paskirti-darbai" class="assigned-tasks-priority">
+    <div class="section-heading">
+      <p class="eyebrow">{{ child.theme|theme_text:"assigned_eyebrow" }}</p>
+      <h2>{{ child.theme|theme_text:"assigned_title" }}</h2>
+    </div>
+    <p>{{ child.theme|theme_text:"assigned_help" }}</p>
+    <div class="assigned-task-list">
+      {% for assigned_task in active_assigned_tasks %}
+      <article class="assigned-task-row">
+        <span class="item-icon">{{ assigned_task.icon_snapshot|icon_symbol }}</span>
+        <div>
+          <h3>{{ assigned_task.title_snapshot }}</h3>
+          <p class="amount positive">+{{ assigned_task.reward_snapshot }} {{ assigned_task.reward_snapshot|currency_unit:child.theme }}</p>
+          {% if assigned_task.note_snapshot %}
+          <p class="assigned-task-note">
+            <span class="assigned-task-note-label">{{ child.theme|theme_text:"assigned_note_label" }}</span>
+            <span class="assigned-task-note-body">{{ assigned_task.note_snapshot }}</span>
+          </p>
+          {% endif %}
+        </div>
+        <form method="post" action="{% url 'child_complete_assigned_task' assigned_task.pk %}" data-success-effect="task">{% csrf_token %}
+          <button class="decision-icon-button decision-approve" type="submit" aria-label="{{ child.theme|theme_text:'assigned_complete' }}" title="{{ child.theme|theme_text:'assigned_complete' }}"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-check"></use></svg></button>
+        </form>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  <div class="section-heading"><p class="eyebrow">{% translate "Choose a task" %}</p><h2>{{ child.theme|theme_text:"nav_tasks" }}</h2></div>
+  {% if revision_claims %}<div class="revision-list"><h3>{% if child.theme == "blockville" %}{{ child.theme|theme_text:"revision" }}{% else %}{% translate "Needs improvement" %}{% endif %}</h3>{% for claim in revision_claims %}
+    <article id="revision-claim-{{ claim.pk }}" class="revision-card notice-block notice-warning"><div><strong>{{ claim.task_title }}</strong>{% if claim.revision_note %}<p>{{ claim.revision_note }}</p>{% endif %}</div><button class="decision-icon-button decision-revise" type="button" data-open-dialog="resubmit-task-{{ claim.pk }}" aria-label="{% translate "Fix and resubmit" %}" title="{% translate "Fix and resubmit" %}"><svg class="action-icon" aria-hidden="true"><use href="#icon-rotate-left"></use></svg></button></article>
+    <dialog id="resubmit-task-{{ claim.pk }}" class="action-dialog evidence-dialog"><button class="dialog-close" type="button" data-close-dialog aria-label="{% translate 'Close' %}" title="{% translate 'Close' %}">
+        <svg class="action-icon" aria-hidden="true"><use href="#icon-xmark"></use></svg>
+      </button><h2>{{ claim.task_title }}</h2><p class="revision-note">{{ claim.revision_note }}</p>
+      <form method="post" action="{% url 'child_resubmit_task' claim.pk %}" enctype="multipart/form-data" class="stack-form evidence-form" data-success-effect="task">{% csrf_token %}
+        <input type="file" name="proof" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" data-evidence-input hidden>
+        <input type="hidden" name="remove_evidence" value="" data-remove-evidence>
+        {% if claim.evidence_thumbnail %}<img class="evidence-preview" src="{% url 'task_evidence' claim.pk 'thumbnail' %}" alt="{% translate 'Task photo' %}" data-evidence-preview>{% else %}<img class="evidence-preview" alt="" data-evidence-preview hidden>{% endif %}
+        <div class="evidence-actions"><button type="button" class="button button-secondary" data-evidence-camera><svg class="action-icon"><use href="#icon-camera"></use></svg>{% translate "Take photo" %}</button><button type="button" class="button button-secondary" data-evidence-gallery>{% translate "Choose from gallery" %}</button><button type="button" class="text-button danger" data-evidence-remove>{% translate "Remove photo" %}</button></div>
+        <label for="resubmit-child-note-{{ claim.pk }}">{% translate "What I did" %}
+          <textarea class="field-control child-claim-note" id="resubmit-child-note-{{ claim.pk }}" name="child_note" maxlength="200" rows="2" enterkeyhint="done" autocomplete="off" placeholder="{% translate "Optional — a short note for your parents" %}">{{ claim.child_note }}</textarea>
+        </label>
+        <button class="decision-icon-button decision-approve dialog-decision-action" type="submit" aria-label="{% translate "Send again" %}" title="{% translate "Send again" %}"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-check"></use></svg></button>
+      </form>
+    </dialog>
+  {% endfor %}</div>{% endif %}
+  {% if rejected_task_claims %}<div class="task-response-list"><h3>{% translate "Parent response" %}</h3>{% for claim in rejected_task_claims %}
+    <article class="task-response-card task-response-rejected">
+      <svg class="action-icon" aria-hidden="true"><use href="#icon-circle-xmark"></use></svg>
+      <div class="task-response-copy">
+        <span class="task-response-status">{% translate "Task rejected" %}</span>
+        <strong>{{ claim.task_title }}</strong>
+        {% if claim.rejection_reason %}<p><b>{% translate "Comment" %}:</b> {{ claim.rejection_reason }}</p>{% endif %}
+        {% if claim.decided_by %}<small class="history-actor">{% translate "Rejected by" %}: {{ claim.decided_by|user_display_name }}</small>{% endif %}
+      </div>
+      <form method="post" action="{% url 'child_acknowledge_task_response' claim.pk %}">{% csrf_token %}
+        <button type="submit" class="decision-icon-button decision-approve task-response-acknowledge" aria-label="{% translate "I understand" %}" title="{% translate "I understand" %}"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-check"></use></svg></button>
+      </form>
+    </article>
+  {% endfor %}</div>{% endif %}
+  <div class="task-search">
+    <label for="task-search-input">{% translate "Find a task" %}:</label>
+    <input
+      id="task-search-input"
+      class="field-control"
+      type="search"
+      placeholder="{% translate 'Type a task name' %}"
+      autocomplete="off"
+      role="combobox"
+      aria-autocomplete="list"
+      aria-controls="task-search-results"
+      aria-expanded="false"
+      data-task-search
+    >
+    <div id="task-search-results" class="task-search-results" role="listbox" hidden data-task-search-results></div>
+  </div>
+  <div class="item-grid">{% for task in tasks %}
+    <article id="task-card-{{ task.pk }}" class="item-card" data-task-card data-task-search-text="{{ task.title }}"><span class="item-icon">{{ task.icon|icon_symbol }}</span><div><h3>{{ task.title }}</h3><p class="amount positive">+{{ task.reward }} {{ task.reward|currency_unit:child.theme }}</p></div>
+    {% if task.pk in pending_task_ids %}<span class="status-pill">{% if child.theme == "blockville" %}{{ child.theme|theme_text:"pending" }}{% else %}{% translate "Awaiting approval" %}{% endif %}</span>{% else %}<button class="decision-icon-button decision-approve workflow-card-button" type="button" data-open-dialog="submit-task-{{ task.pk }}" aria-label="{{ child.theme|theme_text:'task_button' }}" title="{{ child.theme|theme_text:'task_button' }}"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-check"></use></svg></button>{% endif %}</article>
+    <dialog id="submit-task-{{ task.pk }}" class="action-dialog evidence-dialog"><button class="dialog-close" type="button" data-close-dialog aria-label="{% translate 'Close' %}" title="{% translate 'Close' %}">
+        <svg class="action-icon" aria-hidden="true"><use href="#icon-xmark"></use></svg>
+      </button><h2>{{ child.theme|theme_text:"task_modal_title" }}</h2><h3>{{ task.title }}</h3><p>{% translate "You can add a photo or a short note about what you did." %}</p>
+      {% if family_settings.photo_bonus_points %}<p class="photo-bonus">+{{ family_settings.photo_bonus_points }} {{ family_settings.photo_bonus_points|currency_unit:child.theme }} {% translate "for a photo" %}</p>{% endif %}
+      <form method="post" action="{% url 'child_submit_task' task.pk %}" enctype="multipart/form-data" class="stack-form evidence-form" data-success-effect="task">{% csrf_token %}
+        <input type="file" name="proof" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" data-evidence-input hidden>
+        <img class="evidence-preview" alt="" data-evidence-preview hidden>
+        <div class="evidence-actions"><button type="button" class="button button-secondary" data-evidence-camera><svg class="action-icon"><use href="#icon-camera"></use></svg>{% if child.theme == "blockville" %}{{ child.theme|theme_text:"task_photo" }}{% else %}{% translate "Take photo" %}{% endif %}</button><button type="button" class="button button-secondary" data-evidence-gallery>{% translate "Choose from gallery" %}</button><button type="button" class="text-button danger" data-evidence-remove hidden>{% translate "Remove photo" %}</button></div>
+        <label for="submit-child-note-{{ task.pk }}">{% translate "What I did" %}
+          <textarea class="field-control child-claim-note" id="submit-child-note-{{ task.pk }}" name="child_note" maxlength="200" rows="2" enterkeyhint="done" autocomplete="off" placeholder="{% translate "Optional — a short note for your parents" %}"></textarea>
+        </label>
+        <button class="decision-icon-button decision-approve dialog-decision-action" type="submit" aria-label="{{ child.theme|theme_text:'task_modal_submit' }}" title="{{ child.theme|theme_text:'task_modal_submit' }}"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-check"></use></svg></button>
+      </form>
+    </dialog>
+  {% empty %}<p class="empty-state">{% translate "There are no tasks yet." %}</p>{% endfor %}</div>
+  <p class="empty-state" data-task-search-empty hidden>{% translate "No tasks match your search." %}</p>
+</section>
+
+<section id="prizai" class="content-section">
+  <div class="section-heading"><p class="eyebrow">{% translate "Choose a reward" %}</p><h2>{{ child.theme|theme_text:"nav_rewards" }}</h2></div>
+  {% if assigned_tasks_block_rewards %}<div class="credit-warning notice-block notice-info"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-info"></use></svg><p>{{ child.theme|theme_text:"assigned_reward_block" }}</p></div>{% elif credit_reward_requests_blocked %}<div class="credit-warning notice-block notice-info"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-info"></use></svg><p>{% translate "New reward requests are paused because half of the available credit has been used. Earn more points to unlock them." %}</p></div>{% endif %}
+  {% if lottery.is_visible %}
+  <article class="system-lottery-card" data-lottery-card>
+    <div class="lottery-card-art" aria-hidden="true"><span>?</span><span>?</span><span>?</span></div>
+    <div class="lottery-card-copy">
+      <p class="lottery-system-label">{% translate "Surprise cards" %}</p>
+      <h3>{{ child.theme|theme_text:"lottery_title" }}</h3>
+      <p class="lottery-price">{{ lottery.ticket_cost }} {{ lottery.ticket_cost|currency_unit:child.theme }}</p>
+      <p>{% translate "Your points may go up by up to 150, stay the same, or go down by up to 50." %}</p>
+      <p class="lottery-weekly-status">
+        {% blocktranslate with remaining=lottery.tickets_remaining limit=lottery.weekly_limit %}Cards left this week: {{ remaining }} of {{ limit }}.{% endblocktranslate %}
+      </p>
+    </div>
+    <div class="lottery-card-action">
+      {% if lottery.open_ticket %}
+        <button class="button button-primary" type="button" data-open-dialog="lottery-ticket-dialog">{% translate "Continue uncovering" %}</button>
+      {% elif lottery.can_purchase %}
+        <button class="button button-primary" type="button" data-open-dialog="lottery-purchase-dialog">
+          {% blocktranslate with cost=lottery.ticket_cost unit=lottery.ticket_cost|currency_unit:child.theme %}Buy for {{ cost }} {{ unit }}{% endblocktranslate %}
+        </button>
+      {% else %}
+        <button class="button button-secondary" type="button" disabled>
+          {% if lottery.block_reason == "weekly_limit" %}
+            {% translate "Weekly limit reached" %}
+          {% elif lottery.block_reason == "balance" %}
+            {% blocktranslate with cost=lottery.ticket_cost unit=lottery.ticket_cost|currency_unit:child.theme %}You need {{ cost }} earned {{ unit }}{% endblocktranslate %}
+          {% else %}
+            {% translate "Currently unavailable" %}
+          {% endif %}
+        </button>
+      {% endif %}
+    </div>
+  </article>
+  <dialog id="lottery-purchase-dialog" class="action-dialog lottery-purchase-dialog">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="{% translate 'Close' %}" title="{% translate 'Close' %}"><svg class="action-icon"><use href="#icon-xmark"></use></svg></button>
+    <p class="lottery-system-label">{% translate "Surprise cards" %}</p>
+    <h2>{{ child.theme|theme_text:"lottery_title" }}</h2>
+    <div class="lottery-risk-warning notice-block notice-danger">
+      <strong>{% translate "This is a surprise — the result is unknown until all fields are open." %}</strong>
+      <p>{% blocktranslate with cost=lottery.ticket_cost unit=lottery.ticket_cost|currency_unit:child.theme %}It costs {{ cost }} earned {{ unit }}. Your points may go up by up to 150, stay the same, or go down by up to 50. The result cannot reduce your balance below your credit limit.{% endblocktranslate %}</p>
+    </div>
+    <form method="post" action="{% url 'child_purchase_lottery_ticket' %}" class="stack-form">
+      {% csrf_token %}
+      <button class="button button-primary" type="submit">
+        {% blocktranslate with cost=lottery.ticket_cost unit=lottery.ticket_cost|currency_unit:child.theme %}Buy card for {{ cost }} {{ unit }}{% endblocktranslate %}
+      </button>
+      <button class="button button-secondary" type="button" data-close-dialog>{% translate "Not now" %}</button>
+    </form>
+  </dialog>
+  {% if lottery.open_ticket %}
+    <dialog
+      id="lottery-ticket-dialog"
+      class="action-dialog lottery-ticket-dialog"
+      data-lottery-dialog
+      data-ticket-id="{{ lottery.open_ticket.pk }}"
+      data-reveal-url="{% url 'child_reveal_lottery_ticket' lottery.open_ticket.pk %}"
+      data-result-win="{% translate 'Your points went up by {amount}!' %}"
+      data-result-loss="{% translate 'Your points went down by {amount}.' %}"
+      data-result-none="{% translate 'Your points stayed the same.' %}"
+      data-result-protected="{% translate 'No points were taken away.' %}"
+      data-result-balance="{% translate 'New balance: {balance}.' %}"
+      data-result-limited="{% translate 'Your credit limit kept some points safe.' %}"
+      data-progress-text="{% translate '{count} of 9 fields uncovered.' %}"
+      data-result-error="{% translate 'The result could not be saved. Reopen the card and try again.' %}"
+    >
+      <button class="dialog-close" type="button" data-close-dialog aria-label="{% translate 'Close' %}" title="{% translate 'Close' %}"><svg class="action-icon"><use href="#icon-xmark"></use></svg></button>
+      <p class="lottery-system-label">{% translate "Uncover all nine fields" %}</p>
+      <h2>{{ child.theme|theme_text:"lottery_title" }}</h2>
+      <p class="lottery-scratch-help">{% translate "Rub the silver surface with your finger. Three matching numbers reveal the result." %}</p>
+      <div class="scratch-ticket" data-scratch-ticket>
+        <div class="scratch-grid" data-scratch-grid>
+          {% for _ in lottery.open_ticket.values %}
+            <span class="scratch-number scratch-hidden" data-lottery-cell aria-hidden="true"></span>
+          {% endfor %}
+        </div>
+        <canvas class="scratch-surface" data-scratch-surface aria-label="{% translate 'Cover surface' %}"></canvas>
+        <div class="scratch-particles" data-scratch-particles aria-hidden="true"></div>
+      </div>
+      <p class="scratch-progress" data-scratch-progress>{% translate "Uncover every field to see the result." %}</p>
+      <div class="lottery-result" data-lottery-result hidden aria-live="polite">
+        <strong data-lottery-result-title></strong>
+        <p data-lottery-result-copy></p>
+      </div>
+    </dialog>
+  {% endif %}
+  {% endif %}
+  <div class="item-grid">{% for reward in rewards %}<article id="reward-card-{{ reward.pk }}" class="item-card reward-card"><span class="item-icon">{{ reward.icon|icon_symbol }}</span><div><h3>{{ reward.title }}</h3><p class="amount negative">−{{ reward.cost }} {{ reward.cost|currency_unit:child.theme }}</p></div>
+  {% if reward.pk in pending_reward_ids %}<span class="status-pill">{% if child.theme == "blockville" %}{{ child.theme|theme_text:"reward_pending" }}{% else %}{% translate "Awaiting approval" %}{% endif %}</span>{% elif reward_requests_blocked %}<span class="status-pill">{{ child.theme|theme_text:"reward" }}</span>{% elif not reward.is_affordable %}<span class="status-pill" title="{% translate "Not enough points" %}">{% blocktranslate with amount=reward.missing_amount unit=reward.missing_amount|currency_unit:child.theme %}Need {{ amount }} {{ unit }} more{% endblocktranslate %}</span>{% else %}<form class="workflow-card-action" method="post" action="{% url 'child_request_reward' reward.pk %}" data-success-effect="reward">{% csrf_token %}<button class="decision-icon-button decision-approve" type="submit" aria-label="{{ child.theme|theme_text:'reward' }}" title="{{ child.theme|theme_text:'reward' }}"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-check"></use></svg></button></form>{% endif %}</article>{% empty %}<p class="empty-state">{% translate "The rewards catalog is empty." %}</p>{% endfor %}</div>
+  {% if pending_requests %}<div class="pending-list"><h3>{% translate "Pending requests" %}</h3>{% for reward_request in pending_requests %}<div class="list-row"><span>{{ reward_request.reward_title }}</span><form method="post" action="{% url 'child_cancel_reward' reward_request.pk %}">{% csrf_token %}<button class="decision-icon-button decision-reject compact-decision-button" type="submit" aria-label="{% translate "Cancel" %}" title="{% translate "Cancel" %}"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-xmark"></use></svg></button></form></div>{% endfor %}</div>{% endif %}
+</section>
+
+<section class="content-section building-plan-section"><div class="{% if goals %}building-plan-layout{% endif %}">{% if goals %}<div id="tikslai" class="building-plan-goals"><div class="section-heading"><p class="eyebrow">{% translate "Save for a dream" %}</p><h2>{{ child.theme|theme_text:"nav_goals" }}</h2></div>{% for goal in goals %}<article id="goal-card-{{ goal.pk }}" class="goal-card child-goal-card">
+  <div class="goal-card-heading"><div class="goal-title"><span class="item-icon">{{ goal.icon|icon_symbol }}</span><strong>{{ goal.title }}</strong></div><span>{{ goal.progress_amount }} {{ goal.progress_amount|currency_unit:child.theme }} / {{ goal.target_amount }} {{ goal.target_amount|currency_unit:child.theme }}</span></div>
+  <div class="progress"><span style="width: {{ goal.progress_percent }}%"></span></div>
+  {% if goal.interest_rate %}<p class="goal-interest"><svg class="action-icon" aria-hidden="true"><use href="#icon-coins"></use></svg>{% blocktranslate with rate=goal.interest_rate earned=goal.interest_earned %}Earning {{ rate }}% interest every week · {{ earned }} AUD earned so far{% endblocktranslate %}</p>{% endif %}
+  <div class="goal-status-row">
+    {% if goal.mode == "available" %}
+      <span class="goal-status-label"><svg class="action-icon" aria-hidden="true"><use href="#icon-bullseye"></use></svg>{% translate "Current goal" %} <button class="info-button" type="button" data-open-dialog="goal-info-current-{{ goal.pk }}" aria-label="{% translate 'More information' %}" title="{% translate 'More information' %}"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-info"></use></svg></button></span>
+    {% elif goal.mode == "saved" %}
+      <span class="goal-status-label"><svg class="action-icon" aria-hidden="true"><use href="#icon-piggy-bank"></use></svg>{% translate "Saved" %} <button class="info-button" type="button" data-open-dialog="goal-info-saved-{{ goal.pk }}" aria-label="{% translate 'More information' %}" title="{% translate 'More information' %}"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-info"></use></svg></button></span>
+      <button class="button button-secondary goal-add-button" type="button" data-open-dialog="goal-add-{{ goal.pk }}">{% translate "Add points" %}</button>
+    {% else %}
+      <button class="goal-mode-button" type="button" data-open-dialog="goal-mode-{{ goal.pk }}"><svg class="action-icon" aria-hidden="true"><use href="#icon-bullseye"></use></svg>{% translate "Choose mode" %} <svg class="action-icon" aria-hidden="true"><use href="#icon-circle-info"></use></svg></button>
+    {% endif %}
+  </div>
+  {% if goal.is_reached %}
+    {% if goal.has_pending_completion %}<span class="status-pill">{% translate "Awaiting parent approval" %}</span>{% else %}<form method="post" action="{% url 'child_request_goal_completion' goal.pk %}">{% csrf_token %}<button class="button button-primary" type="submit">{% translate "Request completion" %}</button></form>{% endif %}
+  {% endif %}
+</article>
+<dialog id="goal-info-current-{{ goal.pk }}" class="action-dialog"><button class="dialog-close" type="button" data-close-dialog aria-label="{% translate 'Close' %}" title="{% translate 'Close' %}"><svg class="action-icon"><use href="#icon-xmark"></use></svg></button><h2>{% translate "Current goal" %}</h2><p>{% translate "Uses your available points. You can still spend them, so progress may change." %}</p></dialog>
+<dialog id="goal-info-saved-{{ goal.pk }}" class="action-dialog"><button class="dialog-close" type="button" data-close-dialog aria-label="{% translate 'Close' %}" title="{% translate 'Close' %}"><svg class="action-icon"><use href="#icon-xmark"></use></svg></button><h2>{% translate "Saved" %}</h2><p>{% translate "Saved points are kept for this goal and cannot be used for rewards." %}</p></dialog>
+<dialog id="goal-mode-{{ goal.pk }}" class="action-dialog goal-mode-dialog"><button class="dialog-close" type="button" data-close-dialog aria-label="{% translate 'Close' %}" title="{% translate 'Close' %}"><svg class="action-icon"><use href="#icon-xmark"></use></svg></button><h2>{% translate "Choose how to save" %}</h2>
+  <form method="post" action="{% url 'child_set_goal_mode' goal.pk %}" class="goal-mode-form">{% csrf_token %}<div class="goal-mode-options"><div class="goal-mode-option"><label><input type="radio" name="mode" value="available" required><span><strong>{% translate "Use available points" %}</strong><small>{% translate "Your available balance counts as progress." %}</small></span></label><button class="info-button" type="button" data-open-dialog="goal-mode-info-available-{{ goal.pk }}" aria-label="{% translate 'More information' %}" title="{% translate 'More information' %}"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-info"></use></svg></button></div>
+  <div class="goal-mode-option"><label><input type="radio" name="mode" value="saved"><span><strong>{% translate "Save separately" %}</strong><small>{% translate "Move points into this goal." %}</small></span></label><button class="info-button" type="button" data-open-dialog="goal-mode-info-saved-{{ goal.pk }}" aria-label="{% translate 'More information' %}" title="{% translate 'More information' %}"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-info"></use></svg></button></div></div>
+  <div class="dialog-actions"><button class="button button-secondary" type="button" data-close-dialog>{% translate "Cancel" %}</button><button class="button button-primary" type="submit">{% translate "Confirm" %}</button></div></form>
+</dialog>
+<dialog id="goal-mode-info-available-{{ goal.pk }}" class="action-dialog"><button class="dialog-close" type="button" data-close-dialog aria-label="{% translate 'Close' %}" title="{% translate 'Close' %}"><svg class="action-icon"><use href="#icon-xmark"></use></svg></button><h2>{% translate "Use available points" %}</h2><p>{% translate "You can still spend these points on rewards. Your progress may go down." %}</p></dialog>
+<dialog id="goal-mode-info-saved-{{ goal.pk }}" class="action-dialog"><button class="dialog-close" type="button" data-close-dialog aria-label="{% translate 'Close' %}" title="{% translate 'Close' %}"><svg class="action-icon"><use href="#icon-xmark"></use></svg></button><h2>{% translate "Save separately" %}</h2><p>{% translate "These points will no longer be available for rewards." %}</p></dialog>
+{% if goal.mode == "saved" %}<dialog id="goal-add-{{ goal.pk }}" class="action-dialog goal-add-dialog" data-goal-add-dialog data-goal-saved="{{ goal.saved_amount }}" data-goal-target="{{ goal.target_amount }}" data-goal-available="{{ child.available_goal_balance }}"><button class="dialog-close" type="button" data-close-dialog aria-label="{% translate 'Close' %}" title="{% translate 'Close' %}"><svg class="action-icon"><use href="#icon-xmark"></use></svg></button><h2>{% translate "Add points" %}</h2><p>{% blocktranslate with balance=child.available_goal_balance unit=child.available_goal_balance|currency_unit:child.theme %}Available balance: {{ balance }} {{ unit }}{% endblocktranslate %}</p><div class="goal-quick-options"><button type="button" class="button button-secondary" data-goal-quick-amount="10">10</button><button type="button" class="button button-secondary" data-goal-quick-amount="25">25</button><button type="button" class="button button-secondary" data-goal-quick-amount="50">50</button><button type="button" class="button button-secondary" data-goal-quick-all>{% translate "All" %}</button></div><form method="post" action="{% url 'child_add_goal_points' goal.pk %}" class="stack-form" data-goal-add-form>{% csrf_token %}<label>{% translate "Custom amount" %}<input class="field-control" name="amount" type="number" min="1" max="{{ child.available_goal_balance }}" required data-goal-amount-input></label><p class="goal-add-preview">{% translate "After" %}: <strong data-goal-after>{{ child.available_goal_balance }}</strong> {% blocktranslate with unit=child.available_goal_balance|currency_unit:child.theme %}{{ unit }} available{% endblocktranslate %}</p><div class="dialog-actions"><button class="button button-secondary" type="button" data-close-dialog>{% translate "Cancel" %}</button><button class="button button-primary" type="submit">{% translate "Add" %}</button></div></form></dialog>{% endif %}
+{% endfor %}</div>{% endif %}<section id="pasiulymai" class="proposal-section"><div class="panel"><h3>{% translate "Suggest a reward or goal" %}</h3><form method="post" action="{% url 'child_create_proposal' %}" class="stack-form" data-proposal-form>{% csrf_token %}<p><label for="{{ proposal_form.proposal_type.id_for_label }}">{{ proposal_form.proposal_type.label }}</label>{{ proposal_form.proposal_type }}</p><p><label for="{{ proposal_form.title.id_for_label }}">{{ proposal_form.title.label }}</label>{{ proposal_form.title }}</p><p><label for="{{ proposal_form.suggested_cost.id_for_label }}">{{ proposal_form.suggested_cost.label }}</label>{{ proposal_form.suggested_cost }}</p><p><label for="{{ proposal_form.icon.id_for_label }}">{{ proposal_form.icon.label }}</label>{{ proposal_form.icon }}</p><fieldset class="goal-mode-proposal" data-proposal-goal-mode hidden disabled><legend>{% translate "Choose how to save" %}</legend><div class="goal-mode-options"><div class="goal-mode-option"><label><input type="radio" name="goal_mode" value="available"><span><strong>{% translate "Use available points" %}</strong><small>{% translate "Your available balance counts as progress." %}</small></span></label><button class="info-button" type="button" data-open-dialog="proposal-goal-mode-available" aria-label="{% translate 'More information' %}" title="{% translate 'More information' %}"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-info"></use></svg></button></div><div class="goal-mode-option"><label><input type="radio" name="goal_mode" value="saved"><span><strong>{% translate "Save separately" %}</strong><small>{% translate "Move points into this goal." %}</small></span></label><button class="info-button" type="button" data-open-dialog="proposal-goal-mode-saved" aria-label="{% translate 'More information' %}" title="{% translate 'More information' %}"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-info"></use></svg></button></div></div></fieldset><button class="decision-icon-button decision-approve dialog-decision-action" type="submit" aria-label="{{ child.theme|theme_text:'proposal' }}" title="{{ child.theme|theme_text:'proposal' }}"><svg class="action-icon" aria-hidden="true"><use href="#icon-circle-check"></use></svg></button></form><dialog id="proposal-goal-mode-available" class="action-dialog"><button class="dialog-close" type="button" data-close-dialog aria-label="{% translate 'Close' %}" title="{% translate 'Close' %}"><svg class="action-icon"><use href="#icon-xmark"></use></svg></button><h2>{% translate "Use available points" %}</h2><p>{% translate "You can still spend these points on rewards. Your progress may go down." %}</p></dialog><dialog id="proposal-goal-mode-saved" class="action-dialog"><button class="dialog-close" type="button" data-close-dialog aria-label="{% translate 'Close' %}" title="{% translate 'Close' %}"><svg class="action-icon"><use href="#icon-xmark"></use></svg></button><h2>{% translate "Save separately" %}</h2><p>{% translate "These points will no longer be available for rewards." %}</p></dialog></div></section></div></section>
+
+<section id="istorija" class="content-section">
+  <div class="section-heading">
+    <p class="eyebrow">{% translate "What happened" %}</p>
+    <h2>{{ child.theme|theme_text:"nav_history" }}</h2>
+  </div>
+  <div class="ledger">
+    {% for entry in ledger %}
+      <div class="ledger-row">
+        {% if entry.history_type == "task_decision" %}
+          <span class="ledger-icon">{{ entry.task.icon|icon_symbol }}</span>
+          <div>
+            <strong>{{ entry.task_title }}</strong>
+            <small>{{ entry.decided_at|date:"m-d H:i" }} · {% translate "Task" %}</small>
+            {% if entry.decided_by %}<small class="history-actor">{% translate "Rejected by" %}: {{ entry.decided_by|user_display_name }}</small>{% endif %}
+            {% if entry.rejection_reason %}<small class="history-rejection-reason">{% translate "Reason" %}: {{ entry.rejection_reason }}</small>{% endif %}
+          </div>
+          <span class="history-row-actions">
+            <span class="history-decision history-decision-rejected">
+              <svg class="action-icon" aria-hidden="true"><use href="#icon-circle-xmark"></use></svg>
+              {% translate "Rejected" %}
+            </span>
+          </span>
+        {% elif entry.history_type == "reward_decision" %}
+          <span class="ledger-icon">{{ entry.reward.icon|icon_symbol }}</span>
+          <div>
+            <strong>{{ entry.reward_title }}</strong>
+            <small>{{ entry.decided_at|date:"m-d H:i" }} · {% translate "Reward request" %}</small>
+            {% if entry.decided_by %}<small class="history-actor">{% translate "Rejected by" %}: {{ entry.decided_by|user_display_name }}</small>{% endif %}
+            {% if entry.rejection_reason %}<small class="history-rejection-reason">{% translate "Reason" %}: {{ entry.rejection_reason }}</small>{% endif %}
+          </div>
+          <span class="history-row-actions">
+            <span class="history-decision history-decision-rejected">
+              <svg class="action-icon" aria-hidden="true"><use href="#icon-circle-xmark"></use></svg>
+              {% translate "Rejected" %}
+            </span>
+          </span>
+        {% elif entry.history_type == "goal_event" %}
+          <span class="ledger-icon"><svg class="action-icon" aria-hidden="true"><use href="#icon-bullseye"></use></svg></span>
+          <div><strong>{{ entry.description }}</strong><small>{{ entry.created_at|date:"m-d H:i" }} · {% translate "Goal" %}</small></div>
+        {% else %}
+          <span class="ledger-icon">
+            {% if entry.task_claim %}
+              {{ entry.task_claim.task.icon|icon_symbol }}
+            {% elif entry.assigned_task_item %}
+              {{ entry.assigned_task_item.icon_snapshot|icon_symbol }}
+            {% elif entry.reward_request %}
+              {{ entry.reward_request.reward.icon|icon_symbol }}
+            {% elif entry.kind == "gift" %}
+              <svg class="action-icon" aria-hidden="true"><use href="#icon-gift"></use></svg>
+            {% else %}
+              {{ entry.kind|slice:":1"|upper }}
+            {% endif %}
+          </span>
+          <div>
+            <strong>{{ entry.description }}</strong>
+            <small>{{ entry.created_at|date:"m-d H:i" }}</small>
+            {% if entry.task_claim and entry.task_claim.decided_by %}
+              <small class="history-actor">{% translate "Approved by" %}: {{ entry.task_claim.decided_by|user_display_name }}</small>
+            {% elif entry.reward_request and entry.reward_request.decided_by %}
+              <small class="history-actor">{% translate "Approved by" %}: {{ entry.reward_request.decided_by|user_display_name }}</small>
+            {% endif %}
+          </div>
+          <span class="history-row-actions">
+            {% if entry.task_claim.evidence_thumbnail %}
+              <button class="photo-history-button" type="button" data-evidence-full="{% url 'task_evidence' entry.task_claim.pk 'full' %}" aria-label="{% translate 'Open task photo' %}" title="{% translate 'Open task photo' %}"><svg class="action-icon"><use href="#icon-camera"></use></svg></button>
+            {% endif %}
+            <span class="amount {% if entry.delta > 0 %}positive{% elif entry.delta < 0 %}negative{% endif %}">{{ entry.delta|stringformat:"+d" }} {{ entry.delta|currency_unit:child.theme }}</span>
+          </span>
+        {% endif %}
+      </div>
+    {% empty %}
+      <p class="empty-state">{% translate "Point history is empty." %}</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section id="nustatymai" class="content-section child-settings">
+  <div class="section-heading">
+    <p class="eyebrow">{{ child.theme|theme_text:"settings_eyebrow" }}</p>
+    <h2>{{ child.theme|theme_text:"settings_title" }}</h2>
+  </div>
+  <div class="child-settings-accordion" data-child-settings-accordion>
+    <details class="child-settings-acc" name="child-settings" data-settings-panel="world">
+      <summary>
+        <span class="child-settings-acc-icon" aria-hidden="true">🌍</span>
+        <span class="child-settings-acc-title">{{ child.theme|theme_text:"settings_world_title" }}</span>
+        <span class="child-settings-acc-chevron" aria-hidden="true">▾</span>
+      </summary>
+      <div class="child-settings-acc-body">
+        <p class="child-settings-hint">{{ child.theme|theme_text:"settings_world_hint" }}</p>
+        <form method="post" action="{% url 'child_set_theme' %}" class="stack-form child-theme-form" data-success-effect="theme">
+          {% csrf_token %}
+          <fieldset class="theme-choice-fieldset">
+            <legend class="sr-only">{{ theme_form.theme.label }}</legend>
+            <div class="theme-choice-grid child-settings-theme-grid">
+              {% for choice in theme_form.theme %}
+                <label class="theme-choice theme-{{ choice.data.value }}" for="{{ choice.id_for_label }}">
+                  {{ choice.tag }}
+                  <span class="theme-choice-preview item-card">
+                    <strong>{{ choice.choice_label }}</strong>
+                    <small class="theme-choice-sub">{{ choice.data.value|theme_text:"settings_world_sub" }}</small>
+                    <span class="theme-choice-check" aria-hidden="true"><svg class="action-icon"><use href="#icon-circle-check"></use></svg></span>
+                  </span>
+                </label>
+              {% endfor %}
+              <label class="theme-choice theme-daily" for="{{ theme_form.randomize_theme_daily.id_for_label }}">
+                {{ theme_form.randomize_theme_daily }}
+                <span class="theme-choice-preview item-card theme-daily-preview">
+                  <span class="theme-daily-emoji" aria-hidden="true">🎲</span>
+                  <strong>{{ child.theme|theme_text:"settings_daily_title" }}</strong>
+                  <small class="theme-choice-sub">{{ child.theme|theme_text:"settings_daily_sub" }}</small>
+                  <span class="theme-choice-check" aria-hidden="true"><svg class="action-icon"><use href="#icon-circle-check"></use></svg></span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+          {{ theme_form.theme.errors }}
+          {{ theme_form.randomize_theme_daily.errors }}
+          <button class="button button-primary" type="submit">{{ child.theme|theme_text:"settings_cta_theme" }}</button>
+        </form>
+      </div>
+    </details>
+
+    <details class="child-settings-acc" name="child-settings" data-settings-panel="avatar">
+      <summary>
+        <span class="child-settings-acc-icon" aria-hidden="true">{% if child.avatar %}🖼️{% else %}📷{% endif %}</span>
+        <span class="child-settings-acc-title">{{ child.theme|theme_text:"settings_avatar_title" }}</span>
+        <span class="child-settings-acc-chevron" aria-hidden="true">▾</span>
+      </summary>
+      <div class="child-settings-acc-body">
+        <form method="post" action="{% url 'child_set_avatar' %}" enctype="multipart/form-data" class="stack-form evidence-form child-avatar-form" data-success-effect="theme">
+          {% csrf_token %}
+          <div class="child-avatar-row">
+            {% if child.avatar %}
+              <img class="child-avatar-preview" src="{% url 'child_avatar' child.pk %}" alt="" data-evidence-preview>
+            {% else %}
+              <img class="child-avatar-preview" alt="" data-evidence-preview hidden>
+            {% endif %}
+            <div class="avatar-actions evidence-actions">
+              <input type="file" name="avatar" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" data-evidence-input hidden required>
+              <button type="button" class="button button-primary" data-evidence-camera>{{ child.theme|theme_text:"settings_cam" }}</button>
+              <button type="button" class="button button-secondary" data-evidence-gallery>{{ child.theme|theme_text:"settings_gal" }}</button>
+            </div>
+          </div>
+          {{ avatar_form.avatar.errors }}
+          <button class="button button-secondary" type="submit">{% translate "Save" %}</button>
+        </form>
+      </div>
+    </details>
+
+    <details class="child-settings-acc" name="child-settings" id="gimtadienis" data-settings-panel="birthday">
+      <summary>
+        <span class="child-settings-acc-icon" aria-hidden="true">🎂</span>
+        <span class="child-settings-acc-title">{{ child.theme|theme_text:"settings_bday_title" }}</span>
+        <span class="child-settings-acc-chevron" aria-hidden="true">▾</span>
+      </summary>
+      <div class="child-settings-acc-body">
+        {% if pending_birth_date_request %}
+          <div class="birthday-change-pending">
+            <span class="status-pill">{% translate "Awaiting parent approval" %}</span>
+            <p>
+              {% blocktranslate with current=pending_birth_date_request.previous_birth_date|date:"Y-m-d"|default:"–" requested=pending_birth_date_request.requested_birth_date|date:"Y-m-d"|default:"–" %}
+                Requested birthday change: {{ current }} → {{ requested }}.
+              {% endblocktranslate %}
+            </p>
+          </div>
+        {% else %}
+          <form method="post" action="{% url 'child_set_birth_date' %}" class="stack-form">
+            {% csrf_token %}
+            {{ birth_date_form.as_p }}
+            <button class="button button-secondary" type="submit">{% translate "Save" %}</button>
+          </form>
+        {% endif %}
+      </div>
+    </details>
+
+    <details class="child-settings-acc" name="child-settings" id="pinas" data-settings-panel="pin" data-pin-change>
+      <summary>
+        <span class="child-settings-acc-icon" aria-hidden="true">🔒</span>
+        <span class="child-settings-acc-title">{{ child.theme|theme_text:"settings_pin_title" }}</span>
+        <span class="child-settings-acc-chevron" aria-hidden="true">▾</span>
+      </summary>
+      <div class="child-settings-acc-body">
+        <form
+          method="post"
+          action="{% url 'child_change_pin' %}"
+          class="stack-form child-pin-form"
+          data-pin-form
+          data-pin-mismatch="{% translate 'New codes didn’t match — try again' %}"
+          data-pin-ready="{% translate 'Ready to save' %}"
+        >
+          {% csrf_token %}
+          <input type="hidden" name="current_pin" value="" data-pin-field="current_pin" autocomplete="off">
+          <input type="hidden" name="new_pin" value="" data-pin-field="new_pin" autocomplete="off">
+          <input type="hidden" name="confirm_pin" value="" data-pin-field="confirm_pin" autocomplete="off">
+          <ol class="pin-guide" aria-label="{% translate 'PIN change steps' %}">
+            <li class="is-active" data-pin-step="0"><span class="step-num">1</span><span data-pin-step-text>{{ child.theme|theme_text:"settings_pin_step_old" }}</span></li>
+            <li data-pin-step="1"><span class="step-num">2</span><span data-pin-step-text>{{ child.theme|theme_text:"settings_pin_step_new" }}</span></li>
+            <li data-pin-step="2"><span class="step-num">3</span><span data-pin-step-text>{{ child.theme|theme_text:"settings_pin_step_repeat" }}</span></li>
+          </ol>
+          <p class="pin-step-label" data-pin-step-label>{{ child.theme|theme_text:"settings_pin_step_old" }}</p>
+          <div class="pin-dots" aria-hidden="true" data-pin-dots>
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="pin-pad" role="group" aria-label="{% translate 'PIN keypad' %}" data-pin-pad>
+            <button type="button" data-pin-key="1">1</button>
+            <button type="button" data-pin-key="2">2</button>
+            <button type="button" data-pin-key="3">3</button>
+            <button type="button" data-pin-key="4">4</button>
+            <button type="button" data-pin-key="5">5</button>
+            <button type="button" data-pin-key="6">6</button>
+            <button type="button" data-pin-key="7">7</button>
+            <button type="button" data-pin-key="8">8</button>
+            <button type="button" data-pin-key="9">9</button>
+            <span></span>
+            <button type="button" data-pin-key="0">0</button>
+            <button type="button" class="pin-pad-back" data-pin-key="back" aria-label="{% translate 'Delete' %}">
+              <svg class="action-icon" aria-hidden="true"><use href="#icon-circle-xmark"></use></svg>
+            </button>
+          </div>
+          <div class="pin-save-row" data-pin-save hidden>
+            <button class="button button-primary" type="submit">{{ child.theme|theme_text:"settings_pin_save" }}</button>
+          </div>
+        </form>
+      </div>
+    </details>
+  </div>
+</section>
+{% if gift_recipients_available %}
+<dialog id="gift-dialog" class="action-dialog">
+  <button class="dialog-close" type="button" data-close-dialog aria-label="{% translate 'Close' %}" title="{% translate 'Close' %}">
+        <svg class="action-icon" aria-hidden="true"><use href="#icon-xmark"></use></svg>
+      </button>
+  <h2>{% translate "Give points" %}</h2>
+  <p>{% translate "Choose who receives your points and how many to give." %}</p>
+  <form method="post" action="{% url 'child_give_points' %}" class="stack-form" data-gift-form>{% csrf_token %}
+    {{ gift_form.as_p }}
+    <button class="button button-primary" type="submit">{% translate "Send gift" %}</button>
+  </form>
+</dialog>
+{% endif %}
+<dialog id="evidence-lightbox" class="evidence-lightbox"><button class="dialog-close" type="button" data-close-dialog aria-label="{% translate 'Close' %}" title="{% translate 'Close' %}">
+        <svg class="action-icon" aria-hidden="true"><use href="#icon-xmark"></use></svg>
+      </button><img alt="{% translate 'Task photo' %}" data-lightbox-image></dialog>
+{% endblock %}
+{% block floating_actions_extra %}
+{% if gift_recipients_available %}
+<button class="gift-launcher" type="button" data-open-dialog="gift-dialog" aria-label="{% translate 'Give points' %}">
+  <svg class="action-icon" aria-hidden="true"><use href="#icon-gift"></use></svg><span>{% translate "Gift" %}</span>
+</button>
+{% endif %}
+{% endblock %}
